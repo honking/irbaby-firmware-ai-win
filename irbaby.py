@@ -16,7 +16,7 @@ import os
 
 
 queue_msg = queue.Queue(maxsize=1000)   # 全局消息队列
-
+local_ip = str(input('输入本机ip: '))
 
 class udpUtils:
     """udp 报文发送、监听工具类
@@ -26,7 +26,7 @@ class udpUtils:
 
     def __init__(self):
         """初始化 udpUtils """
-        self._local_ip = self.get_local_ip()
+        self._local_ip = local_ip
         self._thread = None
         self._port = 4210
 
@@ -34,6 +34,7 @@ class udpUtils:
         """向 addr 发送 msg 报文"""
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        sock.bind((self._local_ip, 0))
         addr_port = (addr, self._port)
         msg = json.dumps(msg)
         sock.sendto(msg.encode('utf-8'), addr_port)
@@ -46,18 +47,10 @@ class udpUtils:
         server.bind(ip_port)
         while True:
             data, client_addr = server.recvfrom(1024)
-            receive_msg = bytes.decode(data)
-            queue_msg.put(receive_msg)
-
-    def get_local_ip(self):
-        """获取本机 ip 并返回"""
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(('8.8.8.8', 80))
-            ip = s.getsockname()[0]
-        finally:
-            s.close()
-        return str(ip)
+            if client_addr != local_ip:
+                receive_msg = bytes.decode(data)
+                print(receive_msg)
+                queue_msg.put(receive_msg)
 
     def start_thread(self):
         """开始 udp 接收线程"""
@@ -117,7 +110,7 @@ class Irext:
                 print('输入有误请重新输入')
                 continue
 
-            data = {}
+            data = {"cmd":"send"}
             data['ir'] = {}
             data['ir']['send'] = {}
             if choice == 1:
@@ -188,9 +181,11 @@ climate:
 
     def list_categories(self):
         """列出电器种类
+
         Returns:
             Irext 中可用的电器种类
             example:
+
             ['空调','扫地机器人','电视盒子']
         """
         url = 'https://irext.net/irext-server/indexing/list_categories'
@@ -210,6 +205,7 @@ climate:
         """根据电器种类列出品牌列表
         Args:
             category_id: 电器种类代码
+
         Returns:
             用户选择的电器品牌代码
             example:
@@ -242,12 +238,15 @@ climate:
 
     def list_indexes(self, category_id, brand_id):
         """根据电器种类以及品牌列出可用文件
+
         Args:
             cateroty_id: 电器种类代码
             brand_id: 电器品牌代码
+
         Returns:
             可以文件列表
             example:
+
             ['new_ac_5227', 'new_ac_5282', 'new_ac_2807', 'new_ac_3387']
         """
 
@@ -289,9 +288,8 @@ class IRmqttDevice:
 
     def discover_devices(self):
         """发现在线设备"""
-        local_ip = self._udp_client.get_local_ip()
-        data = {}
-        data["upload_ip"] = local_ip
+        data = {"cmd":"query","params":{"ip":local_ip,"type":"discovery"}}
+        
         time_start = time.time()
         time_end = time.time()
         print('正在发现设备:', end='')
@@ -299,12 +297,11 @@ class IRmqttDevice:
             self._udp_client.send(data, addr = '<broadcast>')
             esp_list = queue_msg.get()
             esp_list_json = json.loads(esp_list)
-            if 'ret' in esp_list_json:
-                esp_list_json = esp_list_json['ret']
-                if 'device' in esp_list_json:
-                    esp_list_json = esp_list_json['device']
-                    for key in esp_list_json:
-                        self._esp_list[key] = esp_list_json[key]
+
+            if "query_discovery" == esp_list_json["cmd"]:
+                esp_list_json = esp_list_json['params']
+                self._esp_list[esp_list_json['mac']] = esp_list_json
+
             time_end = time.time() 
             time.sleep(1/10)
             print('.', end='')
@@ -317,7 +314,7 @@ class IRmqttDevice:
             try:
                 i = 1
                 for key in self._esp_list:
-                    print("[{}] 设备名:{}, IP:{}".format(i, key, self._esp_list[key]))
+                    print("[{}] 设备名:{}, IP:{}".format(i, key, self._esp_list[key]["ip"]))
                     i += 1                
                 k = int(input('请选择你将要操作模块：'))
                 if k < 1 or k > len(self._esp_list):
@@ -328,7 +325,7 @@ class IRmqttDevice:
         i = 1
         for key in self._esp_list:
             if k == i:
-                self._device_ip = self._esp_list[key]
+                self._device_ip = self._esp_list[key]["ip"]
                 self._device_name = key
                 break
             i += 1
@@ -411,7 +408,19 @@ class IRmqttDevice:
                 self._udp_client.send(data, self._device_ip)
                 print("设置成功")
                 break
-        
+
+    def get_device_info(self):
+        """获取设备信息"""
+
+        data = {"cmd":"query","params":{"ip":local_ip,"type":"info"}}
+        self._udp_client.send(data, self._device_ip)
+
+    def ota(self):
+        """OTA"""
+        url = str(input('请输入固件OTA地址: '))
+        data = {"cmd":"set","params":{"url":url,"type":"update"}}
+        self._udp_client.send(data, self._device_ip)
+      
     def recv_ir(self):
         """收录自定义红外码"""
         data = {}
@@ -477,7 +486,10 @@ class Menu:
             ("3", "匹配电器(当前只支持空调)"):self._irmqtt_device.parse_ac,
             ("4", "设置红外接收引脚"):self._irmqtt_device.set_recv_pin,
             ("5", "录制自定义红外码"):self._irmqtt_device.recv_ir,
-            ("6", "退出程序"):self.close
+            ("6", "获取信息"):self._irmqtt_device.get_device_info,
+            ("7", "OTA"):self._irmqtt_device.ota,
+            ("8", "扫描设备"):self._irmqtt_device.discover_devices,
+            ("0", "退出程序"):self.close
         }
 
     def display_logo(self):
