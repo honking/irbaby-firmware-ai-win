@@ -376,27 +376,31 @@ void WiFiManager::startWPS() {
   WiFi.beginWPSConfig();
   DEBUG_WM(F("END WPS"));
 }
-/*
-  String WiFiManager::getSSID() {
-  if (_ssid == "") {
+
+String WiFiManager::getSSID()
+{
+  if (_ssid == "")
+  {
     DEBUG_WM(F("Reading SSID"));
     _ssid = WiFi.SSID();
     DEBUG_WM(F("SSID: "));
     DEBUG_WM(_ssid);
   }
   return _ssid;
-  }
+}
 
-  String WiFiManager::getPassword() {
-  if (_pass == "") {
+String WiFiManager::getPassword()
+{
+  if (_pass == "")
+  {
     DEBUG_WM(F("Reading Password"));
     _pass = WiFi.psk();
     DEBUG_WM("Password: " + _pass);
     //DEBUG_WM(_pass);
   }
   return _pass;
-  }
-*/
+}
+
 String WiFiManager::getConfigPortalSSID() {
   return _apName;
 }

@@ -7,6 +7,9 @@
 #ifndef IRBABY_GLOBAL_H
 #define IRBABY_GLOBAL_H
 
+#define BLINKER_WIFI
+#define USE_LED
+
 #include <ArduinoJson.h>
 #include <WiFiManager.h>
 #include <WiFiClient.h>

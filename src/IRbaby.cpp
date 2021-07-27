@@ -41,6 +41,12 @@
 #include "OneButton.h"
 #include "defines.h"
 
+#ifdef BLINKER_WIFI
+#include "Blinker.h"
+#include "Blinker.h"
+char auth[] = "05efae5f33fa";
+#endif                 
+
 #ifdef USE_SENSOR
 #include "IRbabyBinarySensor.h"
 Ticker sensor_ticker;  // binary sensor ticker
@@ -79,7 +85,14 @@ void setup() {
 #ifdef USE_LED
   led.Off();
 #endif  // USE_LED
-  wifi_manager.autoConnect();
+  bool res;
+  res = wifi_manager.autoConnect();
+#ifdef BLINKER_WIFI
+  if (res) {
+    Blinker.begin(auth, wifi_manager.getSSID().c_str(), wifi_manager.getPassword().c_str());
+  }
+#endif
+
 #ifdef USE_LED
   led.On();
 #endif  // USE_LED
