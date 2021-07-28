@@ -21,7 +21,7 @@ void settingsClear();
 /* 加载配置信息 */
 bool settingsLoad();
 
-bool saveACStatus(String, t_remote_ac_status);
+bool saveACStatus(String, t_remote_ac_status*);
 t_remote_ac_status getACState(String file);
 
 void clearBinFiles();

@@ -15,4 +15,6 @@ bool sendIR(String file_name);
 void recvIR();
 bool saveIR(String file_name);
 void initAC(String);
+void sendControl(String file, const UINT8 category, UINT8 key_code, t_remote_ac_status* ac_status);
+
 #endif // IRBABAYIR_H

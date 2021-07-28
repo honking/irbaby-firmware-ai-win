@@ -16,30 +16,34 @@ const uint8_t kTimeout = 50;
 // As this program is a special purpose capture/decoder, let us use a larger
 // than normal buffer so we can handle Air Conditioner remote codes.
 const uint16_t kCaptureBufferSize = 1024;
-static IRsend * ir_send = nullptr;
-static IRrecv * ir_recv = nullptr;
+static IRsend *ir_send = nullptr;
+static IRrecv *ir_recv = nullptr;
 bool saveSignal();
 
 void downLoadFile(String file)
 {
-  HTTPClient http_client;
-  String download_url = DOWNLOAD_PREFIX + file + DOWNLOAD_SUFFIX;
-  String save_path = BIN_SAVE_PATH + file;
-  File cache = LittleFS.open(save_path, "w");
-  if (cache) {
-    http_client.begin(wifi_client, download_url);
-    if (http_client.GET() == HTTP_CODE_OK) {
-        WiFiClient &wificlient = http_client.getStream();
-        uint8_t buff[512];
-        int n = wificlient.readBytes(buff, http_client.getSize());
-        cache.write(buff, n);
-        cache.flush();
+    HTTPClient http_client;
+    String download_url = DOWNLOAD_PREFIX + file + DOWNLOAD_SUFFIX;
+    String save_path = BIN_SAVE_PATH + file;
+    File cache = LittleFS.open(save_path, "w");
+    if (cache)
+    {
+        http_client.begin(wifi_client, download_url);
+        if (http_client.GET() == HTTP_CODE_OK)
+        {
+            WiFiClient &wificlient = http_client.getStream();
+            uint8_t buff[512];
+            int n = wificlient.readBytes(buff, http_client.getSize());
+            cache.write(buff, n);
+            cache.flush();
+        }
     }
-  } else {
-      clearBinFiles();
-  }
-  cache.close();
-  http_client.end();
+    else
+    {
+        clearBinFiles();
+    }
+    cache.close();
+    http_client.end();
 }
 
 bool sendIR(String file_name)
@@ -72,41 +76,7 @@ bool sendIR(String file_name)
 
 void sendStatus(String file, t_remote_ac_status status)
 {
-    String save_path = SAVE_PATH + file;
-    if (!LittleFS.exists(save_path))
-        downLoadFile(file);
-
-    if (LittleFS.exists(save_path))
-    {
-        File cache = LittleFS.open(save_path, "r");
-        if (cache)
-        {
-            UINT16 content_size = cache.size();
-            DEBUGF("content size = %d\n", content_size);
-
-            if (content_size != 0)
-            {
-                UINT8 *content = (UINT8 *)malloc(content_size * sizeof(UINT8));
-                cache.seek(0L, fs::SeekSet);
-                cache.readBytes((char *)content, content_size);
-                ir_binary_open(REMOTE_CATEGORY_AC, 1, content, content_size);
-                UINT16 *user_data = (UINT16 *)malloc(1024 * sizeof(UINT16));
-                UINT16 data_length = ir_decode(0, user_data, &status, FALSE);
-
-                DEBUGF("data_length = %d\n", data_length);
-                ir_recv->disableIRIn();
-                ir_send->sendRaw(user_data, data_length, 38);
-                ir_recv->enableIRIn();
-                ir_close();
-                free(user_data);
-                free(content);
-                saveACStatus(file, status);
-            }
-            else
-                ERRORF("Open %s is empty\n", save_path.c_str());
-        }
-        cache.close();
-    }
+    sendControl(file, REMOTE_CATEGORY_AC, 0, &status);
 }
 
 void recvIR()
@@ -163,55 +133,20 @@ void initAC(String file)
     ACStatus[file]["speed"] = 0;
 }
 
-bool sendKey(String file_name, int key)
+bool sendKey(String file, int key_code)
 {
-    String save_path = SAVE_PATH;
-    save_path += file_name;
-    if (LittleFS.exists(save_path))
-    {
-        File cache = LittleFS.open(save_path, "r");
-        if (cache)
-        {
-            UINT16 content_size = cache.size();
-            DEBUGF("content size = %d\n", content_size);
-
-            if (content_size != 0)
-            {
-                UINT8 *content = (UINT8 *)malloc(content_size * sizeof(UINT8));
-                cache.seek(0L, fs::SeekSet);
-                cache.readBytes((char *)content, content_size);
-                ir_binary_open(2, 1, content, content_size);
-                UINT16 *user_data = (UINT16 *)malloc(1024 * sizeof(UINT16));
-                UINT16 data_length = ir_decode(0, user_data, NULL, FALSE);
-
-                DEBUGF("data_length = %d\n", data_length);
-                if (LOG_DEBUG)
-                {
-                    for (int i = 0; i < data_length; i++)
-                        Serial.printf("%d ", *(user_data + i));
-                    Serial.println();
-                }
-                ir_recv->disableIRIn();
-                ir_send->sendRaw(user_data, data_length, 38);
-                ir_recv->enableIRIn();
-                ir_close();
-                free(user_data);
-                free(content);
-            }
-            else
-                ERRORF("Open %s is empty\n", save_path.c_str());
-        }
-        cache.close();
-    }
+    sendControl(file, REMOTE_CATEGORY_AC, key_code, NULL);
     return true;
 }
 
 void loadIRPin(uint8_t send_pin, uint8_t recv_pin)
 {
-    if (ir_send != nullptr) {
+    if (ir_send != nullptr)
+    {
         delete ir_send;
     }
-    if (ir_recv != nullptr) {
+    if (ir_recv != nullptr)
+    {
         delete ir_recv;
     }
     ir_send = new IRsend(send_pin);
@@ -229,4 +164,46 @@ void disableIR()
 void enableIR()
 {
     ir_recv->enableIRIn();
+}
+
+void sendControl(String file, const UINT8 category, UINT8 key_code, t_remote_ac_status* status)
+{
+    String save_path = SAVE_PATH + file;
+    if (!LittleFS.exists(save_path))
+        downLoadFile(file);
+
+    if (LittleFS.exists(save_path))
+    {
+        File cache = LittleFS.open(save_path, "r");
+        if (cache)
+        {
+            UINT16 content_size = cache.size();
+            DEBUGF("content size = %d\n", content_size);
+
+            if (content_size != 0)
+            {
+                UINT8 *content = (UINT8 *)malloc(content_size * sizeof(UINT8));
+                cache.seek(0L, fs::SeekSet);
+                cache.readBytes((char *)content, content_size);
+                ir_binary_open(category, 1, content, content_size);
+                UINT16 *user_data = (UINT16 *)malloc(1024 * sizeof(UINT16));
+                UINT16 data_length = ir_decode(key_code, user_data, status, FALSE);
+
+                DEBUGF("data_length = %d\n", data_length);
+                ir_recv->disableIRIn();
+                ir_send->sendRaw(user_data, data_length, 38);
+                ir_recv->enableIRIn();
+                ir_close();
+                free(user_data);
+                free(content);
+                if (NULL != status)
+                {
+                    saveACStatus(file, status);
+                }
+            }
+            else
+                ERRORF("Open %s is empty\n", save_path.c_str());
+        }
+        cache.close();
+    }
 }

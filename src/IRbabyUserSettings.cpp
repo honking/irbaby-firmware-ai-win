@@ -89,14 +89,14 @@ void settingsClear()
     ESP.reset();
 }
 
-bool saveACStatus(String file, t_remote_ac_status status)
+bool saveACStatus(String file, t_remote_ac_status* status)
 {
     bool ret = false;
-    ACStatus[file]["power"] = (int)status.ac_power;
-    ACStatus[file]["temperature"] = (int)status.ac_temp;
-    ACStatus[file]["mode"] = (int)status.ac_mode;
-    ACStatus[file]["swing"] = (int)status.ac_swing;
-    ACStatus[file]["speed"] = (int)status.ac_wind_speed;
+    ACStatus[file]["power"] = (int)status->ac_power;
+    ACStatus[file]["temperature"] = (int)status->ac_temp;
+    ACStatus[file]["mode"] = (int)status->ac_mode;
+    ACStatus[file]["swing"] = (int)status->ac_swing;
+    ACStatus[file]["speed"] = (int)status->ac_wind_speed;
     return ret;
 }
 
