@@ -102,18 +102,23 @@ bool saveACStatus(String file, t_remote_ac_status* status)
 
 t_remote_ac_status getACState(String file)
 {
-    t_remote_ac_status status;
-    int power = (int)ACStatus[file]["power"];
-    int temperature = (int)ACStatus[file]["temperature"];
-    int mode = (int)ACStatus[file]["mode"];
-    int swing = (int)ACStatus[file]["swing"];
-    int wind_speed = (int)ACStatus[file]["speed"];
-    status.ac_power = (t_ac_power)power;
-    status.ac_temp = (t_ac_temperature)temperature;
-    status.ac_mode = (t_ac_mode)mode;
-    status.ac_swing = (t_ac_swing)swing;
-    status.ac_wind_speed = (t_ac_wind_speed)wind_speed;
-    return status;
+    if (!ACStatus.containsKey(file)) {
+        initAC(file);
+        return ACStatus[file];
+    } else {
+        t_remote_ac_status status;
+        int power = (int)ACStatus[file]["power"];
+        int temperature = (int)ACStatus[file]["temperature"];
+        int mode = (int)ACStatus[file]["mode"];
+        int swing = (int)ACStatus[file]["swing"];
+        int wind_speed = (int)ACStatus[file]["speed"];
+        status.ac_power = (t_ac_power)power;
+        status.ac_temp = (t_ac_temperature)temperature;
+        status.ac_mode = (t_ac_mode)mode;
+        status.ac_swing = (t_ac_swing)swing;
+        status.ac_wind_speed = (t_ac_wind_speed)wind_speed;
+        return status;
+    }
 }
 
 void clearBinFiles() {

@@ -127,7 +127,8 @@ class Irext:
         self.app_login('6407d3634eccac6ad60b2e07e490433d', \
             'd6730122152c89095aedbc8067fb9b2b')
         self._brand_id = None
-        self._category_id = 1
+        self._category_id = None
+        self._category_name = None
         self._device_ip = device_ip
         self._device_name = device_name
         self._index_id = None
@@ -139,6 +140,14 @@ class Irext:
         index_id = self.list_brands(self._category_id)
         index_list = self.list_indexes(self._category_id, index_id)
         i = 0
+        ac_status = {
+            "power": ACPower.POWER_ON,
+            "temperature": ACTemperature.TEMP_23,
+            "mode": ACMode.MODE_AUTO,
+            "swing": ACSwing.SWING_OFF,
+            "direction": ACWindDirection.DIR_TOP,
+            "speed": ACWindSpeed.SPEED_AUTO,
+        }        
         while True:
             print('# # # # # # # # # # # # # # # # # # # # # # # #')
             print("【空调匹配】")
@@ -150,7 +159,8 @@ class Irext:
             print("[2] 匹配成功")
             print("[3] 试试下一个")
             print("[4] 试试上一个")
-            print("[5] 退出匹配")
+            print("[5] 保存到语音控制")
+            print("[6] 退出匹配")
             try:
                 choice = int(input("所以现在你选择："))
                 if choice < 1 or choice > 5:
@@ -163,15 +173,7 @@ class Irext:
             params = {}
             if self._category_id == 1:
                 params['type'] = 'status'
-                status = {
-                    "power": ACPower.POWER_ON,
-                    "temperature": ACTemperature.TEMP_23,
-                    "mode": ACMode.MODE_AUTO,
-                    "swing": ACSwing.SWING_OFF,
-                    "direction": ACWindDirection.DIR_TOP,
-                    "speed": ACWindSpeed.SPEED_AUTO,
-                }
-                params['status'] = status
+                params['status'] = ac_status
             else:
                 params['type'] = "key"
                 params['key_code'] = 0
@@ -226,6 +228,11 @@ climate:
                     i = len(index_list) - 1
                 continue
             elif choice == 5:
+                send={"cmd":"set","params":{"type":"config", }}
+                self._udp_client.send(send, self._device_ip)
+                input('请按回车继续...')
+                break
+            elif choice == 6:
                 break
             else:
                 continue
@@ -269,15 +276,15 @@ climate:
         while True:
             for i in ret_json['entity']:
                 print("{}.{}".format(i['id'], i['name']), end='  ')
-                categories_list.append(i['id'])
             print()
             try:
                 category_id = int(input('请选择家电类型: '))
-                if category_id in categories_list:
-                    return category_id
-                else:
-                    print('不存在该选项')
-                    continue
+                for i in ret_json['entity']:
+                    if category_id == i['id']:
+                        self._category_name = i['name']
+                        return category_id
+                print('不存在该选项')
+                continue
             except:
                 pass
 

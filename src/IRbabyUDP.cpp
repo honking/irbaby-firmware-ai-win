@@ -41,9 +41,8 @@ uint32_t sendUDP(StaticJsonDocument<1024>* doc, IPAddress ip)
 void sendLogUDP(StaticJsonDocument<1024>* doc)
 {
 #ifdef DEBUG_SERVER
-    String ip_addr = DEBUG_SERVER;
     IPAddress ip;
-    ip.fromString(ip_addr);
+    ip.fromString(DEBUG_SERVER);
         
     DEBUGF("return message %s\n", ip.toString().c_str());
     UDP.beginPacket(ip, DEBUG_PORT);
@@ -55,9 +54,8 @@ void sendLogUDP(StaticJsonDocument<1024>* doc)
 void sendLogUDP(const char *str)
 {
 #ifdef DEBUG_SERVER
-    String ip_addr = DEBUG_SERVER;
     IPAddress ip;
-    ip.fromString(ip_addr);
+    ip.fromString(DEBUG_SERVER);
         
     DEBUGF("return message %s\n", ip.toString().c_str());
     UDP.beginPacket(ip, DEBUG_PORT);

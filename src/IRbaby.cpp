@@ -45,6 +45,16 @@
 #include "Blinker.h"
 #define BLINKER_MIOT_OUTLET
 char auth[] = "05efae5f33fa";
+
+// 空调遥控组件对象
+BlinkerNumber NUM1("kt-fan");
+BlinkerNumber NUM2("kt-settemp");
+BlinkerButton Kelvinator_power("kt-pwr");
+BlinkerButton Kelvinator_setmode("kt-mode");
+BlinkerButton Kelvinator_Light("kt-deng");
+BlinkerButton Kelvinator_sxfan("kt-sx");
+BlinkerSlider Slider1("kt-ran-wen");
+BlinkerSlider Slider2("kt-ran-fan");
 #endif                 
 
 #ifdef USE_SENSOR
@@ -68,6 +78,8 @@ const char* host = "esp8266-webupdate";
 
 OneButton button(RESET_PIN, true);
 
+t_remote_ac_status ac_status;
+
 void setup() {
   if (LOG_DEBUG || LOG_ERROR || LOG_INFO) Serial.begin(BAUD_RATE);
   pinMode(RESET_PIN, INPUT_PULLUP);
@@ -88,8 +100,14 @@ void setup() {
   bool res;
   res = wifi_manager.autoConnect();
 #ifdef BLINKER_WIFI
+
   if (res) {
     Blinker.begin(auth, wifi_manager.getSSID().c_str(), wifi_manager.getPassword().c_str());
+    sendLogUDP(wifi_manager.getSSID().c_str());
+    sendLogUDP(wifi_manager.getPassword().c_str());
+
+    ac_status = getACState("ac");
+    Kelvinator_power.attach(Kelvinator_power_callback);    
   }
 #endif
 
@@ -182,6 +200,11 @@ void loop() {
 #endif
   /* mqtt loop */
   mqttLoop();
+
+#ifdef BLINKER_WIFI
+  Blinker.run();
+#endif
+
   yield();
 }
 
@@ -209,3 +232,39 @@ void uploadIP() {
   http.PUT(body);
   http.end();
 }
+
+#ifdef BLINKER_WIFI
+void Kelvinator_power_callback(const String &state)
+{
+    BLINKER_LOG("get button state: ", state);
+
+    if (state == BLINKER_CMD_ON)
+    {
+        ac_status.ac_power = AC_POWER_ON;
+        ac_status.ac_temp = AC_TEMP_23;
+        ac_status.ac_mode = AC_MODE_AUTO;
+        ac_status.ac_swing = AC_SWING_OFF;
+        ac_status.ac_wind_speed = AC_WS_AUTO;
+        sendStatus(ConfigData['ac']['file'], ac_status);
+
+        Kelvinator_power.icon("fal fa-power-off");
+        Kelvinator_power.color("#00FF00");
+        Kelvinator_power.text("开");
+        Kelvinator_power.print("on");
+    }
+    else if (state == BLINKER_CMD_OFF)
+    {
+        ac_status.ac_power = AC_POWER_ON;
+        ac_status.ac_temp = AC_TEMP_23;
+        ac_status.ac_mode = AC_MODE_AUTO;
+        ac_status.ac_swing = AC_SWING_OFF;
+        ac_status.ac_wind_speed = AC_WS_AUTO;
+        sendStatus(ConfigData['ac']['file'], ac_status);
+        
+        Kelvinator_power.icon("fal fa-power-off");
+        Kelvinator_power.color("#FF0000");
+        Kelvinator_power.text("关");
+        Kelvinator_power.print("off");
+    }
+}
+#endif

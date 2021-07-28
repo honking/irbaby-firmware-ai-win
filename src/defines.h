@@ -69,4 +69,9 @@ typedef unsigned char uint8_t;
 
 /* Sensor Pin*/
 #define SENSOR_PIN 0
+
+/* debug server for receive some log*/
+#define DEBUG_SERVER "192.168.123.131"
+#define DEBUG_PORT 4211
+
 #endif  // _DEFINES_H
