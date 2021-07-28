@@ -43,7 +43,7 @@
 
 #ifdef BLINKER_WIFI
 #include "Blinker.h"
-#include "Blinker.h"
+#define BLINKER_MIOT_OUTLET
 char auth[] = "05efae5f33fa";
 #endif                 
 

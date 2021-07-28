@@ -13,17 +13,67 @@ import queue
 import sys
 import requests
 import os
+from enum import IntEnum
 
 
-queue_msg = queue.Queue(maxsize=1000)   # 全局消息队列
+class ACPower(IntEnum):
+    POWER_ON = 0
+    POWER_OFF = 1
+
+
+class ACMode(IntEnum):
+    MODE_COOL = 0
+    MODE_HEAT = 1
+    MODE_AUTO = 2
+    MODE_FAN = 3
+    MODE_DEHUMIDITY = 4
+
+
+class ACTemperature(IntEnum):
+    TEMP_16 = 0
+    TEMP_17 = 1
+    TEMP_18 = 2
+    TEMP_19 = 3
+    TEMP_20 = 4
+    TEMP_21 = 5
+    TEMP_22 = 6
+    TEMP_23 = 7
+    TEMP_24 = 8
+    TEMP_25 = 9
+    TEMP_26 = 10
+    TEMP_27 = 11
+    TEMP_28 = 12
+    TEMP_29 = 13
+    TEMP_30 = 14
+
+
+class ACSwing(IntEnum):
+    SWING_ON = 0
+    SWING_OFF = 1
+
+
+class ACWindDirection(IntEnum):
+    DIR_TOP = 0
+    DIR_MIDDLE = 1
+    DIR_BOTTOM = 2
+
+
+class ACWindSpeed(IntEnum):
+    SPEED_AUTO = 0
+    SPEED_LOW = 1
+    SPEED_MEDIUM = 2
+    SPEED_HIGH = 3
+
+
+queue_msg = queue.Queue(maxsize=1000)  # 全局消息队列
 local_ip = str(input('输入本机ip: '))
+
 
 class udpUtils:
     """udp 报文发送、监听工具类
     Attributes:
         _thread: udp 报文接收线程
     """
-
     def __init__(self):
         """初始化 udpUtils """
         self._local_ip = local_ip
@@ -32,6 +82,8 @@ class udpUtils:
 
     def send(self, msg, addr):
         """向 addr 发送 msg 报文"""
+        print(json.dumps(msg))
+        return
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         sock.bind((self._local_ip, 0))
@@ -71,7 +123,6 @@ class Irext:
         后才能获取红外码信息，这不会涉及到您的隐私问题，如果你还是不放心
         请到 https://irext.net/sdk/ 申请自己的账户进行替换
     """
-
     def __init__(self, device_name, device_ip):
         """Irext 初始化"""
         self._auther = None
@@ -86,6 +137,7 @@ class Irext:
 
     def parse_ac(self):
         """匹配空调"""
+        self._category_id = self.list_categories()
         index_id = self.list_brands(self._category_id)
         index_list = self.list_indexes(self._category_id, index_id)
         i = 0
@@ -109,20 +161,32 @@ class Irext:
             except:
                 print('输入有误请重新输入')
                 continue
+            send = {}
+            params = {}
+            if self._category_id == 1:
+                params['type'] = 'status'
+                status = {
+                    "power": ACPower.POWER_ON,
+                    "temperature": ACTemperature.TEMP_23,
+                    "mode": ACMode.MODE_AUTO,
+                    "swing": ACSwing.SWING_OFF,
+                    "direction": ACWindDirection.DIR_TOP,
+                    "speed": ACWindSpeed.SPEED_AUTO,
+                }
+                params['status'] = status
+            else:
+                params['type'] = "key"
+                params['key_code'] = 0
 
-            data = {"cmd":"send"}
-            data['ir'] = {}
-            data['ir']['send'] = {}
+            params['file'] = index_list[i] + ".bin"
+            params['signal'] = 'IR'
+
+            send['cmd'] = 'send'
+            send['params'] = params
             if choice == 1:
-                data['ir']['send']['index_id'] = index_list[i] + ".bin"
-                data['ir']['send']['device_type'] = "ac"
-                data['ir']['send']['test'] = True
-                self._udp_client.send(data, self._device_ip)
+                self._udp_client.send(send, self._device_ip)
             elif choice == 2:
-                data['ir']['send']['index_id'] = index_list[i] + ".bin"
-                data['ir']['send']['device_type'] = "ac"
-                data['ir']['send']['test'] = False
-                self._udp_client.send(data, self._device_ip)
+                self._udp_client.send(send, self._device_ip)
                 print('请将以下内容复制到 HomeAssistant 配置文件中')
                 print()
                 print(''' 
@@ -150,7 +214,7 @@ climate:
     swing_mode_command_topic: "/IRmqtt/{0}/ac/{1}/swing"
     min_temp: 16
     max_temp: 30                
-                '''.format(self._device_name, data['ir']['send']['index_id']))
+                '''.format(self._device_name, index_list[i]))
                 input('请按回车继续...')
             elif choice == 3:
                 i += 1
@@ -171,12 +235,17 @@ climate:
     def app_login(self, app_key, app_secret):
         """ 换取 Irext token """
         url = 'https://irext.net/irext-server/app/app_login'
-        headers = {'Content-Type':'application/json'}
-        data = {'appKey':app_key, 'appSecret':app_secret, 'appType':'2'}
-        response = requests.post(url=url, data=json.dumps(data), headers=headers)
+        headers = {'Content-Type': 'application/json'}
+        data = {'appKey': app_key, 'appSecret': app_secret, 'appType': '2'}
+        response = requests.post(url=url,
+                                 data=json.dumps(data),
+                                 headers=headers)
         # print(response.text)
         ret_json = json.loads(response.text)
-        auther = {'id':ret_json['entity']['id'], 'token':ret_json['entity']['token'] }
+        auther = {
+            'id': ret_json['entity']['id'],
+            'token': ret_json['entity']['token']
+        }
         self._auther = auther
 
     def list_categories(self):
@@ -189,18 +258,30 @@ climate:
             ['空调','扫地机器人','电视盒子']
         """
         url = 'https://irext.net/irext-server/indexing/list_categories'
-        headers = {'Content-Type':'application/json'}
+        headers = {'Content-Type': 'application/json'}
         data = {'id':self._auther['id'], 'token':self._auther['token'], \
             'from':'0', 'count':'20'}
-        response = requests.post(url=url, data=json.dumps(data), headers=headers)
+        response = requests.post(url=url,
+                                 data=json.dumps(data),
+                                 headers=headers)
         ret_json = json.loads(response.text)
         categories_list = []
         print('获得家电类型列表: ')
-        for i in ret_json['entity']:
-            print("{}.{}".format(i['id'], i['name']), end='  ')
-            categories_list.append(i)
-        print()
-        
+        while True:
+            for i in ret_json['entity']:
+                print("{}.{}".format(i['id'], i['name']), end='  ')
+                categories_list.append(i['id'])
+            print()
+            try:
+                category_id = int(input('请选择家电类型: '))
+                if category_id in categories_list:
+                    return category_id
+                else:
+                    print('不存在该选项')
+                    continue
+            except:
+                pass
+
     def list_brands(self, category_id=1):
         """根据电器种类列出品牌列表
         Args:
@@ -213,10 +294,12 @@ climate:
             1
         """
         url = 'https://irext.net/irext-server/indexing/list_brands'
-        headers = {'Content-Type':'application/json'}
+        headers = {'Content-Type': 'application/json'}
         data = {'id':self._auther['id'], 'token':self._auther['token'], \
             'categoryId':category_id, 'from':'0', 'count':'2000'}
-        response = requests.post(url=url, data=json.dumps(data), headers=headers)
+        response = requests.post(url=url,
+                                 data=json.dumps(data),
+                                 headers=headers)
         ret_json = json.loads(response.text)
         id_list = []
         print('获得家电品牌列表: ')
@@ -226,7 +309,7 @@ climate:
                 id_list.append(int(i['id']))
             print()
             try:
-                index_id = int(input('请选择空调品牌: '))
+                index_id = int(input('请选择品牌: '))
                 if index_id in id_list:
                     return index_id
                 else:
@@ -234,7 +317,6 @@ climate:
                     continue
             except:
                 pass
-            
 
     def list_indexes(self, category_id, brand_id):
         """根据电器种类以及品牌列出可用文件
@@ -251,10 +333,12 @@ climate:
         """
 
         url = 'https://irext.net/irext-server/indexing/list_indexes'
-        headers = {'Content-Type':'application/json'}
+        headers = {'Content-Type': 'application/json'}
         data = {'id':self._auther['id'], 'token':self._auther['token'], \
             'categoryId':category_id, 'brandId':brand_id, 'from':'1', 'count':'2000'}
-        response = requests.post(url=url, data=json.dumps(data), headers=headers)
+        response = requests.post(url=url,
+                                 data=json.dumps(data),
+                                 headers=headers)
         # print('获得下载 列表: ', end='\n')
         ret_json = json.loads(response.text)
         indexs_list = []
@@ -269,7 +353,6 @@ class IRmqttDevice:
     对模块进行红外接收、发射引脚的设置，连接 MQTT 服务器设置
     收录自定义红外码
     """
-
     def __init__(self):
         """IRmqttDevice 初始化"""
         self._udp_client = udpUtils()
@@ -278,23 +361,39 @@ class IRmqttDevice:
         self._esp_list = {}
         self._recv_pin = None
         self._send_pin = None
-        self._pin_list = ['D0', 'D1', 'D2', 'D3', 'D4', 'D5', 
-                        'D6', 'D7', 'D8', 'D9', 'D10',
-                        '16', '5', '4', '0', '2', 
-                        '14', '12', '13', '15', '3', '1']
-        self._pin_cover = {'D0':'16', 'D1':'5', 'D2':'4', 'D3':'0',
-                        'D4':'2', 'D5':'14', 'D6':'12', 'D7':'13',
-                        'D8':'15', 'D9':'3', 'D10':'1'}
+        self._pin_list = [
+            'D0', 'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8', 'D9', 'D10',
+            '16', '5', '4', '0', '2', '14', '12', '13', '15', '3', '1'
+        ]
+        self._pin_cover = {
+            'D0': '16',
+            'D1': '5',
+            'D2': '4',
+            'D3': '0',
+            'D4': '2',
+            'D5': '14',
+            'D6': '12',
+            'D7': '13',
+            'D8': '15',
+            'D9': '3',
+            'D10': '1'
+        }
 
     def discover_devices(self):
         """发现在线设备"""
-        data = {"cmd":"query","params":{"ip":local_ip,"type":"discovery"}}
-        
+        data = {
+            "cmd": "query",
+            "params": {
+                "ip": local_ip,
+                "type": "discovery"
+            }
+        }
+
         time_start = time.time()
         time_end = time.time()
         print('正在发现设备:', end='')
         while time_end - time_start < 1:
-            self._udp_client.send(data, addr = '<broadcast>')
+            self._udp_client.send(data, addr='<broadcast>')
             esp_list = queue_msg.get()
             esp_list_json = json.loads(esp_list)
 
@@ -302,8 +401,8 @@ class IRmqttDevice:
                 esp_list_json = esp_list_json['params']
                 self._esp_list[esp_list_json['mac']] = esp_list_json
 
-            time_end = time.time() 
-            time.sleep(1/10)
+            time_end = time.time()
+            time.sleep(1 / 10)
             print('.', end='')
         while not queue_msg.empty():
             queue_msg.get()
@@ -314,8 +413,9 @@ class IRmqttDevice:
             try:
                 i = 1
                 for key in self._esp_list:
-                    print("[{}] 设备名:{}, IP:{}".format(i, key, self._esp_list[key]["ip"]))
-                    i += 1                
+                    print("[{}] 设备名:{}, IP:{}".format(
+                        i, key, self._esp_list[key]["ip"]))
+                    i += 1
                 k = int(input('请选择你将要操作模块：'))
                 if k < 1 or k > len(self._esp_list):
                     continue
@@ -333,26 +433,27 @@ class IRmqttDevice:
     def set_recv_pin(self):
         """设置红外接收引脚"""
 
-        data_json = {}
-        data_json['save'] = {}
+        send = {"cmd": "set"}
+        params = {"type": "config"}
         while True:
             print("【红外接收引脚设置】")
             print("注意：请对照可用引脚进行选择")
             print(self._pin_list)
-            data_json['save']['recv_pin'] = str(input('设置引脚: ')).upper()
-            if data_json['save']['recv_pin'] not in self._pin_list:
+            params['recv_pin'] = str(input('设置引脚: ')).upper()
+            if params['recv_pin'] not in self._pin_list:
                 print('引脚设置错误请重新选择')
                 print('# # # # # # # # # # # # # # # # # # # # # # # #')
                 continue
             else:
                 try:
-                    int(data_json['save']['recv_pin'])
+                    int(params['recv_pin'])
                 except:
-                    data_json['save']['recv_pin'] = self._pin_cover[data_json['save']['recv_pin']]
-                self._udp_client.send(data_json, self._device_ip)
+                    params['recv_pin'] = self._pin_cover[params['recv_pin']]
+                send['params'] = params
+                self._udp_client.send(send, self._device_ip)
                 print("设置成功")
                 break
-        
+
     def set_mqtt(self):
         """设置 MQTT 服务器"""
 
@@ -376,7 +477,7 @@ class IRmqttDevice:
         while time_end - time_start < 2:
             print('.', end='')
             try:
-                ret_json = json.loads(queue_msg.get(timeout=1/10))
+                ret_json = json.loads(queue_msg.get(timeout=1 / 10))
                 if 'ret' in ret_json:
                     if ret_json['ret']['mqtt'] == True:
                         connect_status = '连接成功'
@@ -389,38 +490,39 @@ class IRmqttDevice:
     def set_send_pin(self):
         """设置红外发射引脚"""
 
-        data = {}
-        data['save'] = {}
+        send = {"cmd": "set"}
+        params = {"type": "config"}
         while True:
             print("【红外发射引脚设置】")
             print("注意：请对照可用引脚进行选择")
             print(self._pin_list)
-            data['save']['send_pin'] = str(input('设置引脚: ')).upper()
-            if data['save']['send_pin'] not in self._pin_list:
+            params['send_pin'] = str(input('设置引脚: ')).upper()
+            if params['send_pin'] not in self._pin_list:
                 print('引脚设置错误请重新选择')
                 print('# # # # # # # # # # # # # # # # # # # # # # # #')
                 continue
             else:
                 try:
-                    int(data['save']['send_pin'])
+                    int(params['send_pin'])
                 except:
-                    data['save']['send_pin'] = self._pin_cover[data['save']['send_pin']]                
-                self._udp_client.send(data, self._device_ip)
+                    params['send_pin'] = self._pin_cover[params['send_pin']]
+                send['params'] = params
+                self._udp_client.send(send, self._device_ip)
                 print("设置成功")
                 break
 
     def get_device_info(self):
         """获取设备信息"""
 
-        data = {"cmd":"query","params":{"ip":local_ip,"type":"info"}}
+        data = {"cmd": "query", "params": {"ip": local_ip, "type": "info"}}
         self._udp_client.send(data, self._device_ip)
 
     def ota(self):
         """OTA"""
         url = str(input('请输入固件OTA地址: '))
-        data = {"cmd":"set","params":{"url":url,"type":"update"}}
+        data = {"cmd": "set", "params": {"url": url, "type": "update"}}
         self._udp_client.send(data, self._device_ip)
-      
+
     def recv_ir(self):
         """收录自定义红外码"""
         data = {}
@@ -457,10 +559,10 @@ class IRmqttDevice:
                 data['ir']['recv']['save'] = filename
                 self._udp_client.send(data, self._device_ip)
                 print('topic\t\t\t\tpayload')
-                print('/IRmqtt/{}/custom\t\t{}'.format(self._device_name, data['ir']['recv']['save']))
+                print('/IRmqtt/{}/custom\t\t{}'.format(
+                    self._device_name, data['ir']['recv']['save']))
             if choice == 4:
                 break
-
 
     def parse_ac(self):
         irext = Irext(self._device_name, self._device_ip)
@@ -468,7 +570,6 @@ class IRmqttDevice:
 
 
 class Menu:
-
     def __init__(self):
         self._irmqtt_device = IRmqttDevice()
         self._udp_client = udpUtils()
@@ -476,20 +577,20 @@ class Menu:
         self._choice_dict = None
         self.createChoice()
         self.display_logo()
-        self._irmqtt_device.discover_devices()
+        # self._irmqtt_device.discover_devices()
         self.run(self._choice_dict, self._choice_dict)
 
     def createChoice(self):
         self._choice_dict = {
-            ("1", "设置红外发射引脚"):self._irmqtt_device.set_send_pin,
-            ("2", "MQTT 连接设置"):self._irmqtt_device.set_mqtt,
-            ("3", "匹配电器(当前只支持空调)"):self._irmqtt_device.parse_ac,
-            ("4", "设置红外接收引脚"):self._irmqtt_device.set_recv_pin,
-            ("5", "录制自定义红外码"):self._irmqtt_device.recv_ir,
-            ("6", "获取信息"):self._irmqtt_device.get_device_info,
-            ("7", "OTA"):self._irmqtt_device.ota,
-            ("8", "扫描设备"):self._irmqtt_device.discover_devices,
-            ("0", "退出程序"):self.close
+            ("1", "设置红外发射引脚"): self._irmqtt_device.set_send_pin,
+            ("2", "MQTT 连接设置"): self._irmqtt_device.set_mqtt,
+            ("3", "匹配电器"): self._irmqtt_device.parse_ac,
+            ("4", "设置红外接收引脚"): self._irmqtt_device.set_recv_pin,
+            ("5", "录制自定义红外码"): self._irmqtt_device.recv_ir,
+            ("6", "获取信息"): self._irmqtt_device.get_device_info,
+            ("7", "OTA"): self._irmqtt_device.ota,
+            ("8", "扫描设备"): self._irmqtt_device.discover_devices,
+            ("0", "退出程序"): self.close
         }
 
     def display_logo(self):
@@ -535,6 +636,8 @@ class Menu:
         if os.name == 'nt':
             os.system('cls')
         self.display_logo()
+
+
 def main():
     menu = Menu()
 

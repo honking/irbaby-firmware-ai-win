@@ -254,6 +254,21 @@ bool msgHandle(StaticJsonDocument<1024> *p_recv_msg_doc, MsgType msg_type)
                 ConfigData["pin"]["ir_send"] = params["pin"]["ir_send"];
                 ConfigData["pin"]["ir_receive"] = params["pin"]["ir_receive"];
             }
+            if (params.containsKey("ir_send")) {
+                ConfigData["pin"]["ir_send"] = params["ir_send"];
+            }
+            if (params.containsKey("ir_receive")) {
+                ConfigData["pin"]["ir_receive"] = params["ir_receive"];
+            }                        
+            if (params.containsKey("tv")) {
+                ConfigData["tv"]["file"] = params["tv"]["file"];
+            }
+            if (params.containsKey("fan")) {
+                ConfigData["fan"]["file"] = params["fan"]["file"];
+            }
+            if (params.containsKey("ac")) {
+                ConfigData["ac"]["file"] = params["ac"]["file"];
+            }
             send_msg_doc["cmd"] = "return";
             send_msg_doc["params"]["message"] = "set success";
             returnUDP(&send_msg_doc);
