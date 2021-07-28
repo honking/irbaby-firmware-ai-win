@@ -10,6 +10,8 @@ void udpInit();
 char* udpRecive();
 uint32_t sendUDP(StaticJsonDocument<1024>* doc, IPAddress ip);
 uint32_t returnUDP(StaticJsonDocument<1024>* doc);
+void sendLogUDP(StaticJsonDocument<1024>* doc);
+void sendLogUDP(const char *str);
 
 extern IPAddress remote_ip;
 #endif // IRBABY_UDP_H

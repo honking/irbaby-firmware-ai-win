@@ -67,7 +67,7 @@ class ACWindSpeed(IntEnum):
 
 queue_msg = queue.Queue(maxsize=1000)  # 全局消息队列
 local_ip = str(input('输入本机ip: '))
-
+# local_ip = "192.168.123.131"
 
 class udpUtils:
     """udp 报文发送、监听工具类
@@ -82,8 +82,6 @@ class udpUtils:
 
     def send(self, msg, addr):
         """向 addr 发送 msg 报文"""
-        print(json.dumps(msg))
-        return
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         sock.bind((self._local_ip, 0))
@@ -177,8 +175,9 @@ class Irext:
             else:
                 params['type'] = "key"
                 params['key_code'] = 0
+                params['category'] = self._category_id
 
-            params['file'] = index_list[i] + ".bin"
+            params['file'] = index_list[i]
             params['signal'] = 'IR'
 
             send['cmd'] = 'send'
@@ -577,7 +576,7 @@ class Menu:
         self._choice_dict = None
         self.createChoice()
         self.display_logo()
-        # self._irmqtt_device.discover_devices()
+        self._irmqtt_device.discover_devices()
         self.run(self._choice_dict, self._choice_dict)
 
     def createChoice(self):

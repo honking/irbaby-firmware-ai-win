@@ -174,6 +174,7 @@ void loop() {
     DeserializationError error = deserializeJson(udp_msg_doc, msg);
     if (error) ERRORLN("Failed to parse udp message");
     msgHandle(&udp_msg_doc, MsgType::udp);
+    sendLogUDP(& udp_msg_doc);
   }
 
 #ifdef HTTP_UPDATE 

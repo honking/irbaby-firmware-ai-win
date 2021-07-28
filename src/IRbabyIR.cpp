@@ -64,9 +64,9 @@ bool sendIR(String file_name)
         INFOF("file size = %d\n", cache.size());
         INFOLN();
         cache.readBytes((char *)data_buffer, cache.size());
-        ir_recv->disableIRIn();
+        disableIR();
         ir_send->sendRaw(data_buffer, length, 38);
-        ir_recv->enableIRIn();
+        enableIR();
         free(data_buffer);
         cache.close();
         return true;
@@ -133,9 +133,9 @@ void initAC(String file)
     ACStatus[file]["speed"] = 0;
 }
 
-bool sendKey(String file, int key_code)
+bool sendKey(String file, int key_code, const UINT8 category)
 {
-    sendControl(file, REMOTE_CATEGORY_AC, key_code, NULL);
+    sendControl(file, category, key_code, NULL);
     return true;
 }
 
@@ -158,12 +158,17 @@ void loadIRPin(uint8_t send_pin, uint8_t recv_pin)
 
 void disableIR()
 {
+    pinMode(14,OUTPUT);
+    digitalWrite(14,LOW);    
     ir_recv->disableIRIn();
 }
 
 void enableIR()
 {
     ir_recv->enableIRIn();
+    pinMode(14,INPUT_PULLUP);
+    pinMode(13,OUTPUT);
+    digitalWrite(13,LOW);    
 }
 
 void sendControl(String file, const UINT8 category, UINT8 key_code, t_remote_ac_status* status)
@@ -172,6 +177,7 @@ void sendControl(String file, const UINT8 category, UINT8 key_code, t_remote_ac_
     if (!LittleFS.exists(save_path))
         downLoadFile(file);
 
+    sendLogUDP(file.c_str());
     if (LittleFS.exists(save_path))
     {
         File cache = LittleFS.open(save_path, "r");
@@ -189,10 +195,12 @@ void sendControl(String file, const UINT8 category, UINT8 key_code, t_remote_ac_
                 UINT16 *user_data = (UINT16 *)malloc(1024 * sizeof(UINT16));
                 UINT16 data_length = ir_decode(key_code, user_data, status, FALSE);
 
+                sendLogUDP((char*)user_data);
+
                 DEBUGF("data_length = %d\n", data_length);
-                ir_recv->disableIRIn();
+                disableIR();
                 ir_send->sendRaw(user_data, data_length, 38);
-                ir_recv->enableIRIn();
+                enableIR();
                 ir_close();
                 free(user_data);
                 free(content);

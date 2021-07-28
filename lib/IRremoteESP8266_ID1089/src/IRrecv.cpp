@@ -150,14 +150,9 @@ void IRrecv::enableIRIn() {
   // Attach Interrupt
   attachInterrupt(irparams.recvpin, gpio_intr, CHANGE);
 #endif
-    pinMode(14,INPUT_PULLUP);
-    pinMode(13,OUTPUT);
-    digitalWrite(13,LOW);
 }
 
 void IRrecv::disableIRIn() {
-  pinMode(14,OUTPUT);
-  digitalWrite(14,LOW);
 #ifndef UNIT_TEST
   os_timer_disarm(&timer);
   detachInterrupt(irparams.recvpin);

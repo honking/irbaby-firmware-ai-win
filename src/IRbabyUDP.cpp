@@ -38,6 +38,34 @@ uint32_t sendUDP(StaticJsonDocument<1024>* doc, IPAddress ip)
     return UDP.endPacket();
 }
 
+void sendLogUDP(StaticJsonDocument<1024>* doc)
+{
+#ifdef DEBUG_SERVER
+    String ip_addr = DEBUG_SERVER;
+    IPAddress ip;
+    ip.fromString(ip_addr);
+        
+    DEBUGF("return message %s\n", ip.toString().c_str());
+    UDP.beginPacket(ip, DEBUG_PORT);
+    serializeJson(*doc, UDP);
+    UDP.endPacket();
+#endif
+}
+
+void sendLogUDP(const char *str)
+{
+#ifdef DEBUG_SERVER
+    String ip_addr = DEBUG_SERVER;
+    IPAddress ip;
+    ip.fromString(ip_addr);
+        
+    DEBUGF("return message %s\n", ip.toString().c_str());
+    UDP.beginPacket(ip, DEBUG_PORT);
+    UDP.write(str);
+    UDP.endPacket();
+#endif
+}
+
 uint32_t returnUDP(StaticJsonDocument<1024>* doc)
 {
     DEBUGF("return message to %s\n", UDP.remoteIP().toString().c_str());

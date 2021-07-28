@@ -118,7 +118,7 @@ bool msgHandle(StaticJsonDocument<1024> *p_recv_msg_doc, MsgType msg_type)
             {
                 String file = params["file"];
                 unsigned int key_code = params["key_code"];
-                sendKey(file, key_code);
+                sendKey(file, key_code, (int)params["category"]);
             }
             else if (type.equalsIgnoreCase("data"))
             {
